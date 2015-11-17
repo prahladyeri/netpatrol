@@ -1,6 +1,6 @@
 # Net Patrol
 
-## Net Patrol is a small userspace daemon to get detailed bandwidth stats for Ubuntu 14.04 and hopefully it should work in other distros too!
+Net Patrol is a small userspace daemon to get detailed bandwidth stats for Ubuntu 14.04 and hopefully it should work in other distros too!
 
 ## Genesis
 
