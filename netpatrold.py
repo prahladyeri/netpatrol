@@ -254,7 +254,7 @@ class MyApp(Gtk.Application):
 		#. Open local database and do any needed one-time maintenance in constructor (singleton pattern).
 		#~ if self.db == None:
 			#~ self.db = Database()
-		gui_page = self.main_win.notebook.get_current_page()
+		gui_tab = self.main_win.notebook.get_current_page()
 		#. PARSE /proc/net/dev
 		pnd = netpatrol_parser.parse_procnetdev()
 		logging.debug("/proc/net/dev=========")
@@ -328,8 +328,8 @@ class MyApp(Gtk.Application):
 		
 		#. if main_win is active, update the gui too.
 		if gui_tab==0: #basic stats
-			self.db.get_history('1M')
-			self.db.get_history_p('1M')
+			self.db.get_hist('1M')
+			self.db.get_hist_p('1M')
 		elif gui_tab==1: #active processes
 			pass
 		return

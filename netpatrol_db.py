@@ -3,7 +3,7 @@
 # description: DB access class for netpatrol daemon.
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 DB_PATH = "/home/prahlad/source/python/netpatrol/netpatrol.db" #TODO: Change this at the time of installation
 
@@ -14,7 +14,7 @@ class Database:
 		#cnt = self.conn.cursor().execute("select count(*) from sqlite_master").fetchone()[0]
 		#if cnt == 0:
 		self.conn.cursor().execute("create table if not exists sessions(id int, iface text, start_time text, end_time text, rx int, tx int, ports_used text)")
-		self.conn.cursor().execute("create table if not exists proc_sessions(id int, session_id int, pid int, pname text, rx int, tx int, ports_used text)")
+		self.conn.cursor().execute("create table if not exists sessions_p(id int, session_id int, pid int, pname text, cmdline text, rx int, tx int, ports_used text)")
 		self.conn.cursor().execute("create table if not exists error_log(id int primary key, log_time int, log_text text)")
 		
 		## Perform some maintenance, see if any previous unclosed session exists:
@@ -30,16 +30,36 @@ class Database:
 		#TODO: This actually happens in start_session
 		#cnt = self.conn.cursor().execute("insert into sessions where end_time is null").fetchone()[0]
 		#self.conn.cursor().execute("insert into sessions values(?,)").fetchone()[0]
+
+	def get_hist(self, period):
+		if period == 'D': #last day
+			fdate = datetime.now().strftime("%Y-%m-%d 00:00:00.000")
+		if period == '1M': #last month
+			fdate = datetime.now().strftime("%Y-%m-01 00:00:00.000")
+		if period == '6M':
+			fdate = (datetime.now() - timedelta(weeks=24)).strftime("%Y-%m-01 00:00:00.000")
+		if period == '3M':
+			fdate = (datetime.now() - timedelta(weeks=12)).strftime("%Y-%m-01 00:00:00.000")
+			
+		tdate = datetime.now().strftime("%Y-%m-%d %H:%M:%S.000")
+		print fdate, tdate, period
+		print 'select * from sessions where start_time>=? and end_time<=?', fdate, tdate
+		return
+	
+	def get_hist_p(self, period):
+		pass
 		
-		
-	def update_proc(self, ppnd):
-		for pid in ppnd:
-			logging.debug("/proc/" + str(pid) +  "/net/dev=========")
-			for iface in ppnd[pid]:
-				rx = ppnd[pid][iface]['rx']
-				tx = ppnd[pid][iface]['tx']
-				if (iface!='lo' and (rx>0 or tx>0)):
-					logging.debug(pid, iface, rx, tx)
+	def get_active_p(self):
+		pass
+	
+	#~ def update_proc(self, ppnd):
+		#~ for pid in ppnd:
+			#~ logging.debug("/proc/" + str(pid) +  "/net/dev=========")
+			#~ for iface in ppnd[pid]:
+				#~ rx = ppnd[pid][iface]['rx']
+				#~ tx = ppnd[pid][iface]['tx']
+				#~ if (iface!='lo' and (rx>0 or tx>0)):
+					#~ logging.debug(pid, iface, rx, tx)
 	
 	def end_session(self, d):
 		self.conn.cursor().execute("update sessions set end_time=?, rx=?, tx=? where id=? and iface=?", (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), d['pnd']['rx'],d['pnd']['tx'] ,self.session_id, d['name']))
