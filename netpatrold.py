@@ -254,9 +254,9 @@ class MyApp(Gtk.Application):
 		#. Open local database and do any needed one-time maintenance in constructor (singleton pattern).
 		#~ if self.db == None:
 			#~ self.db = Database()
-		gui_tab = self.main_win.notebook.get_current_page()
-		#. PARSE /proc/net/dev
-		pnd = netpatrol_parser.parse_procnetdev()
+		gui_tab = self.main_win.notebook.get_current_page() #-1 if the window is closed
+		#. PARSE THE NEEDED THINGS FIRST
+		pnd = netpatrol_parser.parse_procnetdev() # {'ppp0': {'rx':0, 'tx':0}}
 		logging.debug("/proc/net/dev=========")
 		for iface in pnd:
 			#if iface!='lo': print iface, pnd[iface][0], pnd[iface][8]
@@ -264,26 +264,31 @@ class MyApp(Gtk.Application):
 		logging.debug( "")
 		
 		#. PARSE /proc/<pid>/net/dev
-		ppnd = netpatrol_parser.parse_procnetdev_pid()
-		#~ print ppnd
-		for pid in ppnd:
-			#print "/proc/" + str(pid) +  "/net/dev========="
-			for iface in ppnd[pid]:
-				rx = int(ppnd[pid][iface]['rx'])
-				tx = int(ppnd[pid][iface]['tx'])
-				if (iface!='lo' and (rx>0 or tx>0)): logging.debug(str.format("{0} {1} {2}", iface, rx, tx))
+		ppnd = netpatrol_parser.parse_procnetdev_pid() # {'ppp0': {2010: {'rx':0, 'tx':0}}}
 		
-		#. PARSE /proc/<pid>/net/tcp
+		#print ppnd
+		for iface in ppnd:
+			#print "/proc/" + str(pid) +  "/net/dev========="
+			for pid in ppnd[iface]:
+				rx = int(ppnd[iface][pid]['rx'])
+				tx = int(ppnd[iface][pid]['tx'])
+				#if (iface!='lo' and (rx>0 or tx>0)):
+				#print iface, pid, rx, tx
+					#logging.info(str.format("{3}, {0} {1} {2}", iface, rx, tx, pid))
+					#print ppnd[pid], pid
+					#~ pass
+		
+		#. PARSE /proc/<pid>/net/tcp #DO THIS ONLY IF GUI IS ACTIVE, AND WE NEED TO SHOW SOMETHING
 		ppntcp = netpatrol_parser.parse_procnettcp_pid()
 
-		#. START DOING SOME WORK
+		#. START DOING SOME ACTUAL WORK
 		if self.active_sessions == None:
 			# START A NEW SESSION
 			self.active_sessions = {}
 			self.active_processes = {}
 			self.active_session_id = int(time.time()) #Generate a random new session_id which should be pretty long.
 			self.db = Database(self.active_session_id)
-			logging.info("New db created")
+			logging.info("New db created.")
 			
 		added = set(pnd.keys()).difference(self.active_sessions.keys()) #newly added iface in pnd
 		removed = set(self.active_sessions.keys()).difference(pnd.keys()) #just removed iface from pnd
@@ -305,7 +310,8 @@ class MyApp(Gtk.Application):
 		for iface in added:
 			self.active_sessions[iface] = {}
 			self.active_sessions[iface]['name'] = iface
-			self.active_sessions[iface]['pnd'] = pnd[iface]
+			self.active_sessions[iface]['pnd'] = pnd[iface] #REMEMBER: pnd attr only pertains to this iface.
+			self.active_sessions[iface]['ppnd'] = ppnd[iface] #REMEMBER: ppnd attr only pertains to this iface.
 			self.active_sessions[iface]['start_time']  = time.time() #TODO: This is only for ref, actually set by db class
 			self.active_sessions[iface]['end_time']  = 0
 			self.db.start_session(self.active_sessions[iface])
@@ -317,18 +323,24 @@ class MyApp(Gtk.Application):
 			self.db.end_session( self.active_sessions.pop(iface))
 			
 		
-		#. For each existing iface in active_sessions, update its rx and tx values.
-		for iface in inters:
-			self.active_sessions[iface]['pnd']  = pnd[iface]
-			#update db if needed
-			last_updated = self.db.last_updated
-			if last_updated==None or (time.time() - last_updated)>10: #update after interval of a few secs
-				self.db.update_session(self.active_sessions[iface])
-				logging.info("updated session")
+		self.active_sessions[iface]['pnd']  = pnd[iface]
+		self.active_sessions[iface]['ppnd']  = ppnd[iface]
+		#. For each existing iface in active_sessions, update its rx and tx values to db.
+		last_updated = self.db.last_updated
+		if last_updated==None or (time.time() - last_updated)>10: #update after interval of a few secs
+			for iface in inters:
+				#update db if needed
+					self.db.update_session(self.active_sessions[iface])
+					# lets do it for processes too
+					for pid in ppnd[iface]:
+						self.db.update_session_p(self.active_sessions[iface], pid)
+						#print self.active_sessions[iface]['ppnd']
+					logging.info("updated session")
+			self.db.conn.commit()
 		
 		#. if main_win is active, update the gui too.
 		if gui_tab==0: #basic stats
-			print self.db.get_hist('1M')
+			#print self.db.get_hist('1M')
 			self.db.get_hist_p('1M')
 		elif gui_tab==1: #active processes
 			pass

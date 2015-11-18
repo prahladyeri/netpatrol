@@ -30,12 +30,12 @@ def format_data(strdata, is_pid=False):
 	for result in arr: #process each file
 		tstr = result.split("\n")
 		if is_pid:
-			results = {} #reset results dict 
+			#results = {} #reset results dict 
 			sproc = tstr[0].split("/")[2]
-		try:
-			pid = int(sproc)
-		except:
-			pass
+			try:
+				pid = int(sproc)
+			except:
+				pass
 			
 		if (is_pid and pid==0):
 			continue #not a valid pid
@@ -49,11 +49,32 @@ def format_data(strdata, is_pid=False):
 			iface = iface.strip()
 			#results[iface] = data.split()
 			arr = data.split()
-			results[iface] = {'rx':int(arr[0]), 'tx':int(arr[8])}
-		if is_pid: presults[pid] = results
+			if is_pid:
+				if not iface in results: results[iface] = {}
+				##TODO: get /proc/<pid>/net/cmdline and add it to the process
+				cmdline = ''
+				try:
+					fp = open('/proc/' + str(pid) + '/cmdline','r')
+					cmdline = fp.read()
+					fp.close()
+				except:
+					#print 'error occured for cmdline: ' + '/proc/' + str(pid) + '/cmdline'
+					pass
+				
+				if cmdline.strip()=='' or cmdline==None: continue
+				cmdline = cmdline.replace(chr(0),'')
+				if cmdline.strip()=='' or cmdline==None: continue
+				rx = int(arr[0])
+				tx = int(arr[8])
+				results[iface][pid] = {'cmdline':cmdline, 'rx':rx, 'tx':tx}
+				print "done for process ",cmdline, pid, rx, tx
+			else:
+				results[iface] = {'rx':int(arr[0]), 'tx':int(arr[8])}
+		#if is_pid: presults[pid] = results
 		#print "processed for ", pid
 	if is_pid:
-		return presults
+		#return presults
+		return results
 	else:
 		return results
 

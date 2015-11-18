@@ -13,9 +13,9 @@ class Database:
 		self.conn.row_factory = sqlite3.Row
 		self.session_id = session_id
 		#cnt = self.conn.cursor().execute("select count(*) from sqlite_master").fetchone()[0]
-		#if cnt == 0:
+		#SESSION_ID + IFACE MAKE A PRIMARY KEY
 		self.conn.cursor().execute("create table if not exists sessions(id int, iface text, start_time text, end_time text, rx int, tx int, ports_used text)")
-		self.conn.cursor().execute("create table if not exists sessions_p(id int, session_id int, pid int, pname text, cmdline text, rx int, tx int, ports_used text)")
+		self.conn.cursor().execute("create table if not exists sessions_p(session_id int, iface text, pid int, pname text, cmdline text, rx int, tx int, ports_used text)")
 		self.conn.cursor().execute("create table if not exists error_log(id int primary key, log_time int, log_text text)")
 		
 		## Perform some maintenance, see if any previous unclosed session exists:
@@ -74,11 +74,31 @@ class Database:
 
 	def update_session(self, d):
 		self.conn.cursor().execute("update sessions set rx=?, tx=? where id=? and iface=?", (d['pnd']['rx'],d['pnd']['tx'] , self.session_id, d['name']))
-		self.conn.commit()
+		
+		#self.conn.commit()
 		#print iface, rx, tx
 		logging.info(str.format("{0}, {1}, {2}, {3}", self.session_id, d['name'], d['pnd']['rx'], d['pnd']['tx']))
 		self.last_updated = time.time()
 		
+	def update_session_p(self, d, pid):
+		#now lets do the same for processes
+		#(session_id int, iface text, pid int, pname text, cmdline text, rx int, tx int, ports_used text)
+		iface = d['name']
+		cmdline=''
+		try:
+			cmdline = d['ppnd'][pid]['cmdline']
+		except:
+			print 'ERROR', d['ppnd'][pid],  d['ppnd']
+		rx = d['ppnd'][pid]['rx']
+		tx = d['ppnd'][pid]['tx']
+		if rx>0 or tx>0:
+			self.conn.cursor().execute("delete from sessions_p where session_id=? and iface=? and pid=?", (self.session_id, iface, pid))
+			self.conn.cursor().execute("insert into sessions_p values(?,?,?,?,?,?,?,'')", (self.session_id, iface, pid ,cmdline, cmdline, rx,tx))
+		
+		#self.conn.commit()
+		#print iface, rx, tx
+		#logging.info(str.format("{0}, {1}, {2}, {3}", self.session_id, d['name'], d['pnd']['rx'], d['pnd']['tx']))
+		self.last_updated = time.time()
 		
 	#~ def close(self):
 		#~ self.conn.cursor().execute("update sessions set end_time=? where id=?", (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), self.session_id))
