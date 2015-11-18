@@ -10,6 +10,7 @@ DB_PATH = "/home/prahlad/source/python/netpatrol/netpatrol.db" #TODO: Change thi
 class Database:
 	def __init__(self, session_id):
 		self.conn = sqlite3.connect(DB_PATH)
+		self.conn.row_factory = sqlite3.Row
 		self.session_id = session_id
 		#cnt = self.conn.cursor().execute("select count(*) from sqlite_master").fetchone()[0]
 		#if cnt == 0:
@@ -42,24 +43,23 @@ class Database:
 			fdate = (datetime.now() - timedelta(weeks=12)).strftime("%Y-%m-01 00:00:00.000")
 			
 		tdate = datetime.now().strftime("%Y-%m-%d %H:%M:%S.000")
-		print fdate, tdate, period
-		print 'select * from sessions where start_time>=? and end_time<=?', fdate, tdate
-		return
+		tsql = 'select iface, sum(rx) as rxbytes, sum(tx) as txbytes from sessions where start_time>=? and end_time<=? group by iface'
+		result = self.conn.cursor().execute(tsql, (fdate, tdate)).fetchall()
+		retval = []
+		#print result[0], result[1]
+		#print tsql, fdate, tdate
+		for session in result:
+			#print session['iface'], session['rxbytes'], session['txbytes']
+			#if session['rxbytes'] ==0 and session['txbytes'] ==0: continue
+			retval.append({'iface':session['iface'], 'rxbytes':session['rxbytes'], 'txbytes':session['txbytes']})
+		return retval
 	
 	def get_hist_p(self, period):
 		pass
 		
 	def get_active_p(self):
 		pass
-	
-	#~ def update_proc(self, ppnd):
-		#~ for pid in ppnd:
-			#~ logging.debug("/proc/" + str(pid) +  "/net/dev=========")
-			#~ for iface in ppnd[pid]:
-				#~ rx = ppnd[pid][iface]['rx']
-				#~ tx = ppnd[pid][iface]['tx']
-				#~ if (iface!='lo' and (rx>0 or tx>0)):
-					#~ logging.debug(pid, iface, rx, tx)
+
 	
 	def end_session(self, d):
 		self.conn.cursor().execute("update sessions set end_time=?, rx=?, tx=? where id=? and iface=?", (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), d['pnd']['rx'],d['pnd']['tx'] ,self.session_id, d['name']))
@@ -89,3 +89,13 @@ class Database:
 		
 if __name__ == "__main__":
 	db = Database()
+
+	
+	#~ def update_proc(self, ppnd):
+		#~ for pid in ppnd:
+			#~ logging.debug("/proc/" + str(pid) +  "/net/dev=========")
+			#~ for iface in ppnd[pid]:
+				#~ rx = ppnd[pid][iface]['rx']
+				#~ tx = ppnd[pid][iface]['tx']
+				#~ if (iface!='lo' and (rx>0 or tx>0)):
+					#~ logging.debug(pid, iface, rx, tx)
